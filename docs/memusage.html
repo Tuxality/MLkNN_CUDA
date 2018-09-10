@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<!--
+Written by Przemyslaw Skryjomski for the Neurocomputing MLkNN on GPU implementation submission
+For more information about license, see the included README file.
+-->
+<html>
+<head>
+<title>MLkNN GPU Memory Usage Calculator</title>
+<style type="text/css">
+input[type=text], select, button {
+ width: 150px;
+ padding: 5px 5px;
+ margin: 8px 0;
+ box-sizing: border-box;
+ border: 2px solid green;
+ border-radius: 4px;
+}
+
+input[type=text]:focus, select:focus, button:hover {
+ border: 2px solid #555;
+ background: #e6f5d1;
+}
+
+input[type=text]:disabled {
+ background: #fff;
+}
+
+input, label, select, button {
+ display: block;
+}
+
+.divblock {
+ margin-left: 5px;
+ margin-right: 5px;
+ float: left;
+}
+
+.peak {
+ background: #ff0000;
+}
+</style>
+<script type="text/javascript">
+var type = 4, unit = "MB", unit_divider = 1048576;
+
+function get_values(names) {
+ var array = [];
+
+ for(var i = 0; i<names.length; i++) {
+  var el = document.getElementById(names[i]);
+  array.push(parseFloat(el.value));
+ }
+
+ return array;
+}
+
+function get_elements(names) {
+ var array = [];
+
+ for(var i = 0; i<names.length; i++) {
+  var el = document.getElementById(names[i]);
+  array.push(el);
+ }
+
+ return array;
+}
+
+function setValue(el, i, val) {
+ el[i].value = (Math.round((val/unit_divider)*10000))/10000 + " " + unit;
+}
+
+function update() {
+ // parameters
+ var val = get_values([	'p_neighbors',
+			'p_features',
+			'p_labels',
+			'p_train',
+			'p_test',
+			'p_type',
+			'p_unit'
+			]);
+
+ var V = {
+  NEIGHBORS: 0,
+  FEATURES: 1,
+  LABELS: 2,
+  TRAIN: 3,
+  TEST: 4,
+  TYPE: 5,
+  UNIT: 6
+ };
+
+ var el = get_elements(['r_train_dataset',
+			'r_train_distance_matrix',
+			'r_train_knn_indices',
+			'r_train_minmax_scaling',
+			'r_train_apriori',
+			'r_train_aposteriori',
+			'r_test_dataset',
+			'r_test_distance_matrix',
+			'r_test_knn_indices',
+			'r_test_prediction',
+			'r_summary_build',
+			'r_summary_sync',
+			'r_summary_predict',
+			'r_summary_sync_predict',
+			'r_summary_peak',
+			]);
+
+ var E = {
+  TRAIN_DATASET: 0,
+  TRAIN_DISTMATRIX: 1,
+  TRAIN_KNNINDICES: 2,
+  TRAIN_MINMAXSCALE: 3,
+  TRAIN_APRIORI: 4,
+  TRAIN_APOSTERIORI: 5,
+  TEST_DATASET: 6,
+  TEST_DISTMATRIX: 7,
+  TEST_KNNINDICES: 8,
+  TEST_PREDICTION: 9,
+  SUMMARY_BUILD: 10,
+  SUMMARY_SYNC: 11,
+  SUMMARY_PREDICT: 12,
+  SUMMARY_SYNCPREDICT: 13,
+  SUMMARY_PEAK: 14
+ };
+
+ // update
+ type = val[V.TYPE];
+ unit_divider = val[V.UNIT];
+
+ switch(unit_divider) {
+  case 1:		unit = "B"; break;
+  case 1024:		unit = "KB"; break;
+  case 1048576:		unit = "MB"; break;
+  case 1073741824:	unit = "GB"; break;
+ }
+
+ var sizeof_int = 4;
+
+ var train_dataset = (val[V.TRAIN] * val[V.FEATURES] * type) + (val[V.TRAIN] * val[V.LABELS] * sizeof_int);
+ var train_distmatrix = (val[V.TRAIN] * val[V.TRAIN] * type);
+ var train_knnindices = (val[V.TRAIN] * val[V.NEIGHBORS] * sizeof_int);
+ var train_minmaxscale = (val[V.FEATURES] * type) * 3;
+ var train_apriori = (val[V.LABELS] * sizeof_int) + (val[V.LABELS] * type) * 2;
+ var train_aposteriori = (val[V.LABELS] * (val[V.NEIGHBORS] + 1) * sizeof_int) * 2 + (val[V.LABELS] * sizeof_int) * 2 + (val[V.LABELS] * (val[V.NEIGHBORS] + 1) * type) * 2;
+
+ var test_dataset = (val[V.TEST] * val[V.FEATURES] * type) + (val[V.TEST] * val[V.LABELS] * sizeof_int);
+ var test_distmatrix = (val[V.TEST] * val[V.TRAIN] * type);
+ var test_knnindices = (val[V.TEST] * val[V.NEIGHBORS] * sizeof_int);
+ var test_prediction = (val[V.TEST] * val[V.LABELS] * sizeof_int) * 2;
+ 
+ var summary_build = train_dataset + train_distmatrix + train_knnindices + train_minmaxscale + train_apriori + train_aposteriori;
+ var summary_sync = summary_build - (train_distmatrix + train_knnindices + (val[V.LABELS] * 4) * 2);
+ var summary_predict = test_dataset + test_distmatrix + test_knnindices + test_prediction;
+ var summary_syncpredict = summary_sync + summary_predict;
+
+ var summary_peak = Math.max(summary_build, summary_syncpredict);
+
+ setValue(el, E.TRAIN_DATASET, train_dataset);
+ setValue(el, E.TRAIN_DISTMATRIX, train_distmatrix);
+ setValue(el, E.TRAIN_KNNINDICES, train_knnindices);
+ setValue(el, E.TRAIN_MINMAXSCALE, train_minmaxscale);
+ setValue(el, E.TRAIN_APRIORI, train_apriori);
+ setValue(el, E.TRAIN_APOSTERIORI, train_aposteriori);
+ setValue(el, E.TEST_DATASET, test_dataset);
+ setValue(el, E.TEST_DISTMATRIX, test_distmatrix);
+ setValue(el, E.TEST_KNNINDICES, test_knnindices);
+ setValue(el, E.TEST_PREDICTION, test_prediction);
+ setValue(el, E.SUMMARY_BUILD, summary_build);
+ setValue(el, E.SUMMARY_SYNC, summary_sync);
+ setValue(el, E.SUMMARY_PREDICT, summary_predict);
+ setValue(el, E.SUMMARY_SYNCPREDICT, summary_syncpredict);
+ setValue(el, E.SUMMARY_PEAK, summary_peak);
+}
+</script>
+</head>
+<body onload="update();">
+<div id="main">
+ <div>
+ <p><b>Multi-Label k-Nearest Neighbors memory usage calculator for NVIDIA CUDA based GPU implementation</b></p>
+ <p>Written with Neurocomputing "Speeding up k-Nearest Neighbors Classifier for Large-Scale Multi-Label Learning on GPUs" submission (NEUCOM-D-17-03724) in mind.<br/>
+ For more information please refer to the paper as well as to the included README file.</p>
+ </div>
+
+ <div id="p_controls" class="divblock">
+  <p><b>Parameters</b></p>
+  <form>
+   <label for="p_neighbors">Neighbors:</label>
+   <input type="text" id="p_neighbors" value="10" onkeyup="update();">
+   <label for="p_features">Features:</label>
+   <input type="text" id="p_features" value="5000" onkeyup="update();"/>
+   <label for="p_labels">Labels:</label>
+   <input type="text" id="p_labels" value="4000" onkeyup="update();"/>
+   <label for="p_train">Train instances:</label>
+   <input type="text" id="p_train" value="10000" onkeyup="update();"/>
+   <label for="p_test">Test instances:</label>
+   <input type="text" id="p_test" value="5000" onkeyup="update();"/>
+   <label for="p_type">Data type:</label>
+   <select id="p_type" onchange="update();">
+    <option value="4">float</option>
+    <option value="8">double</option>
+   </select>
+   <label for="p_unit">Memory unit:</label>
+   <select id="p_unit" onchange="update();">
+    <option value="1">B</option>
+    <option value="1024">KB</option>
+    <option value="1048576" selected>MB</option>
+    <option value="1073741824">GB</option>
+   </select>
+   <button type="button" onclick="update();">Update</button>
+  </form>
+ </div>
+
+ <div id="r_train" class="divblock">
+  <p><b>Train</b></p>
+  <form>
+   <label for="r_train_dataset">Dataset:</label>
+   <input type="text" id="r_train_dataset" value="" disabled/>
+   <label for="r_train_distance_matrix">Distance Matrix:</label>
+   <input type="text" id="r_train_distance_matrix" value="" disabled/>
+   <label for="r_train_knn_indices">kNN indices:</label>
+   <input type="text" id="r_train_knn_indices" value="" disabled/>
+   <label for="r_train_minmax_scaling">MinMax scaling:</label>
+   <input type="text" id="r_train_minmax_scaling" value="" disabled/>
+   <label for="r_train_apriori">Apriori probabilities:</label>
+   <input type="text" id="r_train_apriori" value="" disabled/>
+   <label for="r_train_aposteriori">Aposteriori probabilities:</label>
+   <input type="text" id="r_train_aposteriori" value="" disabled/>
+  </form>
+ </div>
+
+ <div id="r_test" class="divblock">
+  <p><b>Test</b></p>
+  <form>
+   <label for="r_test_dataset">Dataset:</label>
+   <input type="text" id="r_test_dataset" value="" disabled/>
+   <label for="r_test_distance_matrix">Distance Matrix:</label>
+   <input type="text" id="r_test_distance_matrix" value="" disabled/>
+   <label for="r_test_knn_indices">kNN indices:</label>
+   <input type="text" id="r_test_knn_indices" value="" disabled/>
+   <label for="r_test_prediction">Prediction:</label>
+   <input type="text" id="r_test_prediction" value="" disabled/>
+  </form>
+ </div>
+
+ <div id="r_summary" class="divblock">
+ <p><b>Summary</b></p>
+  <form>
+   <label for="r_summary_build">Build:</label>
+   <input type="text" id="r_summary_build" value="" disabled/>
+   <label for="r_summary_sync">Sync:</label>
+   <input type="text" id="r_summary_sync" value="" disabled/>
+   <label for="r_summary_predict">Predict:</label>
+   <input type="text" id="r_summary_predict" value="" disabled/>
+   <label for="r_summary_sync_predict">Sync + Predict:</label>
+   <input type="text" id="r_summary_sync_predict" value="" disabled/>
+   <label for="r_summary_peak"><font color="red">Peak:</font></label>
+   <input type="text" id="r_summary_peak" value="" disabled class="peak"/>
+  </form>
+ </div>
+</div>
+</body>
+</html>
